@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Калькулятор</title>
+<style>
+  :root { --bg:#eef1f5; --body:#2b3340; --screen:#f6f8fa; --num:#ffffff; --op:#dfe6ee; --eq:#2f6fd6; --clr:#e4573d; --text:#1d232c; }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body { background: var(--bg); display: flex; align-items: center; justify-content: center; font-family: "Segoe UI", Arial, sans-serif; color: var(--text); }
+  .calc { width: 320px; max-width: 94vw; background: var(--body); border-radius: 16px; padding: 16px; box-shadow: 0 8px 24px rgba(0,0,0,.25); }
+  .screen { background: var(--screen); border-radius: 10px; padding: 10px 14px; margin-bottom: 14px; text-align: right; min-height: 82px; }
+  .expr { font-size: 15px; color: #6a7482; min-height: 20px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .value { font-size: 36px; font-weight: 600; margin-top: 6px; overflow-x: auto; white-space: nowrap; }
+  .keys { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  button { font: inherit; font-size: 22px; padding: 14px 0; border: 0; border-radius: 10px; background: var(--num); color: var(--text); cursor: pointer; }
+  button:hover { filter: brightness(.95); }
+  button:active { transform: translateY(1px); }
+  button:focus-visible { outline: 3px solid #ffd24a; outline-offset: 2px; }
+  .op { background: var(--op); }
+  .eq { background: var(--eq); color: #fff; }
+  .clr { background: var(--clr); color: #fff; }
+</style>
+</head>
+<body>
+<div class="calc" role="application" aria-label="Калькулятор">
+  <div class="screen">
+    <div class="expr" id="expr"></div>
+    <div class="value" id="value">0</div>
+  </div>
+  <div class="keys">
+    <button class="clr" data-k="C">C</button>
+    <button class="op" data-k="Back">⌫</button>
+    <button class="op" data-k="%">%</button>
+    <button class="op" data-k="/">÷</button>
+
+    <button data-k="7">7</button>
+    <button data-k="8">8</button>
+    <button data-k="9">9</button>
+    <button class="op" data-k="*">×</button>
+
+    <button data-k="4">4</button>
+    <button data-k="5">5</button>
+    <button data-k="6">6</button>
+    <button class="op" data-k="-">−</button>
+
+    <button data-k="1">1</button>
+    <button data-k="2">2</button>
+    <button data-k="3">3</button>
+    <button class="op" data-k="+">+</button>
+
+    <button data-k="neg">±</button>
+    <button data-k="0">0</button>
+    <button data-k=".">,</button>
+    <button class="eq" data-k="=">=</button>
+  </div>
+</div>
+
+<script>
+(function () {
+  var cur = "0", prev = null, op = null, fresh = false, justEq = false;
+  var sym = { "+": "+", "-": "−", "*": "×", "/": "÷" };
+  var valueEl = document.getElementById("value"), exprEl = document.getElementById("expr");
+
+  function fmt(s) { return String(s).replace(".", ","); }
+  function show() { valueEl.textContent = fmt(cur); }
+  function num(x) { return parseFloat(x); }
+  function clean(n) {
+    if (!isFinite(n)) return "Ошибка";
+    var s = String(parseFloat(n.toPrecision(14)));
+    if (s.indexOf("e") !== -1) s = n.toString();
+    return s;
+  }
+  function calc(a, b, o) {
+    if (o === "+") return a + b;
+    if (o === "-") return a - b;
+    if (o === "*") return a * b;
+    if (o === "/") return b === 0 ? NaN : a / b;
+    return b;
+  }
+  function digit(d) {
+    if (cur === "Ошибка") cur = "0";
+    if (fresh || justEq) { cur = "0"; fresh = false; if (justEq) { exprEl.textContent = ""; prev = null; op = null; } justEq = false; }
+    if (d === ".") { if (cur.indexOf(".") === -1) cur += "."; }
+    else cur = (cur === "0") ? d : (cur === "-0" ? "-" + d : cur + d);
+    if (cur.replace(/[-.]/g, "").length > 15) cur = cur.slice(0, -1);
+  }
+  function operator(o) {
+    if (cur === "Ошибка") return;
+    if (op && !fresh && !justEq) {
+      var r = clean(calc(num(prev), num(cur), op));
+      cur = r; prev = r;
+    } else prev = cur;
+    op = o; fresh = true; justEq = false;
+    exprEl.textContent = fmt(prev) + " " + sym[o];
+    show();
+  }
+  function equals() {
+    if (!op || cur === "Ошибка") return;
+    var b = cur, a = prev;
+    var r = clean(calc(num(a), num(b), op));
+    exprEl.textContent = fmt(a) + " " + sym[op] + " " + fmt(b) + " =";
+    cur = r; prev = null; op = null; justEq = true; fresh = false;
+  }
+  function percent() {
+    if (cur === "Ошибка") return;
+    if (prev !== null && op && (op === "+" || op === "-")) cur = clean(num(prev) * num(cur) / 100);
+    else cur = clean(num(cur) / 100);
+  }
+  function press(k) {
+    if (/^[0-9.]$/.test(k)) digit(k);
+    else if (k === "+" || k === "-" || k === "*" || k === "/") { operator(k); return; }
+    else if (k === "=") equals();
+    else if (k === "%") percent();
+    else if (k === "neg") { if (cur !== "0" && cur !== "Ошибка") cur = cur[0] === "-" ? cur.slice(1) : "-" + cur; }
+    else if (k === "Back") {
+      if (justEq || fresh || cur === "Ошибка") return;
+      cur = cur.length > 1 && !(cur.length === 2 && cur[0] === "-") ? cur.slice(0, -1) : "0";
+    }
+    else if (k === "C") { cur = "0"; prev = null; op = null; fresh = false; justEq = false; exprEl.textContent = ""; }
+    show();
+  }
+
+  document.querySelector(".keys").addEventListener("click", function (e) {
+    var b = e.target.closest("button"); if (b) press(b.getAttribute("data-k"));
+  });
+  document.addEventListener("keydown", function (e) {
+    var k = e.key;
+    if (/^[0-9]$/.test(k) || "+-*/%".indexOf(k) !== -1) press(k);
+    else if (k === "," || k === ".") press(".");
+    else if (k === "Enter" || k === "=") { e.preventDefault(); press("="); }
+    else if (k === "Backspace") press("Back");
+    else if (k === "Escape" || k === "Delete") press("C");
+  });
+  show();
+})();
+</script>
+</body>
+</html>
